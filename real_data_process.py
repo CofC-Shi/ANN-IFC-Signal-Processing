@@ -38,7 +38,7 @@ folder_path = "../experimental_data/7um_040224/stream_00008.mat"
 #
 # total_time = 0
 
-data_out, phase, freq_labels, sample_freq = load_data(folder_path)
+data_out, freq_labels, sample_freq = load_data(folder_path)
 
 # Display results
 # print(f"Number of channels loaded: {len(data_out)}")

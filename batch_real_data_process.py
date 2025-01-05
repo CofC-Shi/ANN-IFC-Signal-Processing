@@ -151,12 +151,12 @@ def plot_peaks(noisy_data, processed_data, result, sampling_frequency, file_name
     )
 
     # Add labels and legend
-    # plt.title(f"Detected Peaks for File: {file_name}")
-    # plt.xlabel("Time (s)")
-    # plt.ylabel("Amplitude")
-    # plt.legend()
-    # plt.grid(True)
-    # plt.show()
+    plt.title(f"Detected Peaks for File: {file_name}")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Amplitude")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
     # #
 
@@ -169,7 +169,7 @@ def process_mat_file(file_path, window_size, model_path, scaler_x_path, scaler_y
     Processes a single .mat file to extract peaks from denoised signal.
     """
     try:
-        data_out, phase, freq_labels, sampling_frequency = load_data(file_path)
+        data_out, freq_labels, sampling_frequency = load_data(file_path)
         noisy_data = np.array(data_out[1])  # Select desired channel
 
         # Detrend data

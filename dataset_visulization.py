@@ -6,8 +6,8 @@ import matplotlib
 
 matplotlib.use("Qt5Agg")  # Use the Qt5Agg backend
 # Load both datasets
-data1 = pd.read_csv('./extracted_features_4um_03.csv')
-data2 = pd.read_csv('./extracted_features_7um_03.csv')
+data1 = pd.read_csv('./data/extracted_features_4um_03.csv')
+data2 = pd.read_csv('./data/extracted_features_7um_03.csv')
 
 # Filter for Channel 1 data only (as an example)
 data1_filtered = data1[['Amplitude', 'Width time (ms)']].copy()

@@ -199,14 +199,12 @@ def load_data(data_address):
         # Extract x, y, and phase components of the sample
         x = np.array(demod.sample.x)
         y = np.array(demod.sample.y)
-        phase = np.array(demod.sample.phase)
 
         # Compute the magnitude (r)
         r = np.sqrt(x**2 + y**2)
 
         # Append the magnitude to the data output
         data_out.append(r)
-        phase.append(phase)
 
         # Extract frequency
         if isinstance(demod.freq, np.ndarray) or hasattr(demod.freq, 'value'):
@@ -217,7 +215,7 @@ def load_data(data_address):
         if sample_freq is None and hasattr(demod.rate, 'value'):
             sample_freq = demod.rate.value
 
-    return data_out, phase, freq_labels, sample_freq
+    return data_out, freq_labels, sample_freq
 
 def apply_neural_network_denoising(X_test, model_path, scaler_x_path, scaler_y_path, device="cpu"):
     """

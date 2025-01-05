@@ -13,8 +13,8 @@ from sklearn.neighbors import KNeighborsClassifier
 
 matplotlib.use("Qt5Agg")  # Use the Qt5Agg backend
 # Load both datasets
-data1 = pd.read_csv('./extracted_features_4um_03.csv')
-data2 = pd.read_csv('./extracted_features_7um_03.csv')
+data1 = pd.read_csv('./data/extracted_features_4um_03.csv')
+data2 = pd.read_csv('./data/extracted_features_7um_03.csv')
 
 # Filter for Channel 1 data only (as an example)
 data1_filtered = data1[['Amplitude', 'Width time (ms)']].copy()
@@ -75,41 +75,3 @@ plt.title('ROC Curve')
 plt.legend()
 plt.show()
 
-# x_min, x_max = X_resampled[:, 0].min() - 0.1, X_resampled[:, 0].max() + 0.1
-# y_min, y_max = X_resampled[:, 1].min() - 0.1, X_resampled[:, 1].max() + 0.1
-# xx, yy = np.meshgrid(np.linspace(x_min, x_max, 200),
-#                      np.linspace(y_min, y_max, 200))
-#
-# Z = classifier.predict(np.c_[xx.ravel(), yy.ravel()])
-# Z = Z.reshape(xx.shape)
-#
-# plt.figure(figsize=(6, 5))
-# plt.contourf(xx, yy, Z, alpha=0.3, cmap='coolwarm')
-# plt.scatter(X_resampled[:, 0], X_resampled[:, 1], c=y_resampled, cmap='coolwarm', edgecolor='k')
-# plt.xlabel('Amplitude (V)')
-# plt.ylabel('Transient Time (ms)')
-# plt.title('Decision Boundary')
-# plt.show()
-
-plt.figure(figsize=(10, 5))
-
-# Histogram for amplitude
-plt.subplot(1, 2, 1)
-plt.hist(data1_filtered['Amplitude'], bins=20, alpha=0.7, label='4µm', color='blue')
-plt.hist(data2_filtered['Amplitude'], bins=20, alpha=0.7, label='7µm', color='red')
-plt.xlabel('Amplitude (V)')
-plt.ylabel('Frequency')
-plt.title('Amplitude Distribution')
-plt.legend()
-
-# Histogram for transient time
-plt.subplot(1, 2, 2)
-plt.hist(data1_filtered['Width time (ms)'], bins=20, alpha=0.7, label='4µm', color='blue')
-plt.hist(data2_filtered['Width time (ms)'], bins=20, alpha=0.7, label='7µm', color='red')
-plt.xlabel('Transient Time (ms)')
-plt.ylabel('Frequency')
-plt.title('Transient Time Distribution')
-plt.legend()
-
-plt.tight_layout()
-plt.show()
