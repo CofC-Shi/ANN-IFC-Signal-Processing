@@ -1,11 +1,24 @@
 # ANN-Based Signal Processing for Impedance Flow Cytometry (IFC)
 ## Overview
-This project implements an Artificial Neural Network (ANN) for robust and efficient signal processing in impedance flow cytometry (IFC). The system leverages an ANN to detect and classify signals corresponding to single-cell events, ensuring accurate and robust performance. The approach integrates advanced noise-handling and preprocessing techniques to improve signal quality and detection accuracy.
+Impedance flow cytometry (IFC) is a label-free technique for characterizing micron-scale particles, offering advantages such as non-invasive analysis and high-throughput capabilities. However, the inherent noise and variability in impedance signals pose significant challenges to reliable particle characterization.
+
+This project introduces a novel signal processing framework leveraging an Artificial Neural Network (ANN) for denoising raw time-domain impedance signals. By integrating time-series forecasting with ANN-based filtering, the method effectively reduces noise while preserving key signal features critical for particle analysis. The denoised signals are processed to extract features that serve as inputs for machine learning classifiers to distinguish between different particle populations.
+
+Experimental evaluations show that this ANN-based approach outperforms traditional filtering techniques, such as Savitzky-Golay and Notch filters, across varying noise levels. Using Random Forest and k-Nearest Neighbors models, the system achieves an area-under-the-curve (AUC) value of 0.96 and an overall accuracy of 92%. These results demonstrate the potential of combining advanced signal processing with machine learning to enhance the precision and robustness of particle characterization in label-free IFC systems.
+
 ## Features
-+ Signal Detection and Classification: Utilizes ANN to detect key signal peaks and classify them.
-+ Noise Mitigation: Handles various types of noise (periodic, white, and pink noise) for clean signal extraction.
-+ Custom Time-Series Processing: Processes signals over time for robust feature extraction.
++ Signal Denoising with ANN: Leverages an ANN-based framework for noise reduction in raw time-domain impedance signals.
+
++ Time-Series Forecasting Integration: Incorporates a time-series forecasting model to improve denoising performance.
+
++ Feature Extraction for Classification: Processes denoised signals to extract meaningful features for particle classification.
+
++ Machine Learning Classifiers: Supports Random Forest and k-Nearest Neighbors classifiers for particle population distinction.
+
++ Noise Robustness: Demonstrates improved performance across different levels of periodic, white, and pink noise.
+
 ## Repository Structure
+```
 ├── .git
 ├── .idea
 ├── Config
@@ -48,6 +61,6 @@ This project implements an Artificial Neural Network (ANN) for robust and effici
 ├── trainer.py
 ├── trend_plot.py
 ├── utils.py
-
+```
 ## Contact
 For questions or feedback, reach out via email at shil1@cofc.edu or open an issue on GitHub.
