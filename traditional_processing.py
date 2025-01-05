@@ -8,7 +8,8 @@ import pickle
 import torch
 from sklearn.metrics import mean_squared_error, r2_score
 from torch.utils.data import DataLoader
-from utils import TimeSeriesDataset, generate_sliding_window_dataset_TSF, read_and_stack_csv_files
+from utils import TimeSeriesDataset, generate_sliding_window_dataset_TSF, read_and_stack_csv_files, apply_delay
+
 
 # Define processing methods
 def apply_notch_filter(signal, fs, frequencies, Q=5):
@@ -61,8 +62,9 @@ def apply_neural_network_denoising(X_test, model_path, scaler_x_path, scaler_y_p
 
     denoised_signal = np.concatenate(denoised_signal, axis=0)
     denoised_signal = scaler_y.inverse_transform(denoised_signal)
+    delayed_denoised_signal = apply_delay(denoised_signal, window_size)
 
-    return denoised_signal.flatten()
+    return delayed_denoised_signal.flatten()
 
 # Noise levels and corresponding datasets
 noise_levels = ['2_2e-5', '5e-5', '1e-4', '2e-4', '3e-4', '5e-4', '7e-4']
@@ -73,9 +75,9 @@ fs = 7196  # Sampling frequency
 notch_freqs = [60, 120]  # Frequencies for notch filtering
 window_size = 32
 savgol_params = {'window_length': 10, 'polyorder': 3}
-model_path = './models/Custom_TF_stream_30_7e-4.pkl'
-scaler_x_path = './scalers/Custom_TF_stream_30_7e-4_X.pkl'
-scaler_y_path = './scalers/Custom_TF_stream_30_7e-4_y.pkl'
+model_path = './models/Custom_TF_stream_30_1e-4.pkl'
+scaler_x_path = './scalers/Custom_TF_stream_30_1e-4_X.pkl'
+scaler_y_path = './scalers/Custom_TF_stream_30_1e-4_y.pkl'
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -115,9 +117,12 @@ for noise_level in noise_levels:
     }
 
 # Save results
-output_dir = "processed_signals"
+output_dir = "./processed_signals_by_noise_level"
 os.makedirs(output_dir, exist_ok=True)
-with open(os.path.join(output_dir, "processed_signals.json"), "w") as f:
-    json.dump(processed_signals, f, indent=4)
 
-print("Processed signals saved for all noise levels.")
+for noise_level, data in processed_signals.items():
+    output_file = os.path.join(output_dir, f'processed_signals_{noise_level}.json')
+    with open(output_file, 'w') as out_f:
+        json.dump({noise_level: data}, out_f, indent=4)
+
+print(f"Processed signals split into individual files in {output_dir}")

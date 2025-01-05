@@ -11,7 +11,5 @@ outdir: "./output"                   # Directory to save model outputs and logs
 # Flag for train
 train_model: False                # A flag for switching train and testing
 
-model: CustomModel
-
 window_size: 32
 test_size: 0.2

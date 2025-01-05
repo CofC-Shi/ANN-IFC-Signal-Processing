@@ -55,7 +55,6 @@ Experimental evaluations show that this ANN-based approach outperforms tradition
 ├── plot_denoised_data.py
 ├── ReadMe.md
 ├── real_data_process.py
-├── split_json.py
 ├── time_series_forecasting_Custom.py
 ├── traditional_processing.py
 ├── trainer.py

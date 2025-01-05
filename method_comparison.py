@@ -2,53 +2,41 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib
 import padasip as pa
 import pickle
 import json
 import scipy.signal as ss
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+import torch
+from torch.utils.data import DataLoader
+from utils import TimeSeriesDataset, generate_sliding_window_dataset_TSF, read_and_stack_csv_files,apply_neural_network_denoising
+import os
 
-
-def rms(array):
+matplotlib.use("Qt5Agg")  # Use the Qt5Agg backend
+def detect_event_regions(clean_signal, threshold=0):
     """
-       Computes the Root Mean Square (RMS) of an array.
+    Detect event regions where the clean signal significantly deviates from zero.
+    This assumes that events are regions with significant activity in the clean signal.
 
-       Args:
-           array (np.ndarray): Input array.
+    Args:
+        clean_signal (array): The clean signal data.
+        threshold (float): Threshold to identify non-zero activity in the clean signal.
 
-       Returns:
-           float: RMS value of the array.
-   """
-    return np.sqrt(np.mean(np.square(array)))
-
-
-def detect_events(signal, threshold):
+    Returns:
+        events (list): List of tuples with start and end indices for each event region.
     """
-        Detects events in a signal based on crossing a threshold.
+    event_indices = np.where(np.abs(clean_signal) > threshold)[0]  # Detect where signal exceeds threshold
+    if len(event_indices) == 0:
+        return []  # No events detected
 
-        Args:
-            signal (np.ndarray): 1D array representing the signal.
-            threshold (float): Value for detecting positive and negative peaks.
-
-        Returns:
-            list: List of tuples (start_idx, end_idx) for each detected event.
-    """
     events = []
-    in_pos_peak = False
-    in_event = False
-    start_idx = 0
-    for i, value in enumerate(signal):
-        if value < -threshold and not in_event:
-            in_event = True
-            start_idx = i
-        elif value > threshold:
-            in_pos_peak = True
-        elif value < threshold:
-            if in_pos_peak:
-                end_idx = i
-                events.append((start_idx, end_idx))
-                in_pos_peak = False
-                in_event = False
+    start = event_indices[0]
+    for i in range(1, len(event_indices)):
+        if event_indices[i] != event_indices[i - 1] + 1:  # Break in continuity
+            events.append((start, event_indices[i - 1]))
+            start = event_indices[i]
+    events.append((start, event_indices[-1]))  # Add the last event
     return events
 
 
@@ -66,41 +54,39 @@ def af_method(signal, delay, n_weights, mu):
 
 def snr_calc(clean_signal, noisy_signal):
     assert noisy_signal.shape == clean_signal.shape
-    noise = noisy_signal - clean_signal
-    snr = 20 * np.log10(rms(clean_signal) / rms(noise))
+    # Calculate signal and noise power
+    signal_power = np.sum(clean_signal ** 2) / len(clean_signal)
+    noise_power = np.sum((noisy_signal - clean_signal) ** 2) / len(clean_signal)
+
+    return 10 * np.log10(signal_power / noise_power) if noise_power > 0 else np.inf
+
+def calculate_event_snr(clean, noisy, events):
+    """
+    Calculate SNR for identified event regions.
+
+    Args:
+        clean (array): The clean signal data.
+        noisy (array): The noisy signal data.
+        events (list): List of tuples with start and end indices for each event region.
+
+    Returns:
+        float: SNR value for the event regions.
+    """
+    signal_power = 0
+    noise_power = 0
+    for start, end in events:
+        event_clean = clean[start:end+1]
+        event_noisy = noisy[start:end+1]
+        signal_power += np.sum(event_clean**2)
+        noise_power += np.sum((event_noisy - event_clean)**2)
+
+    # Normalize by number of samples and calculate SNR
+    signal_power /= len(clean)
+    noise_power /= len(clean)
+    snr = 10 * np.log10(signal_power / noise_power)
     return snr
 
-
-def snr_calc_updated(clean_signal, noisy_signal):
-    S = np.max(clean_signal)
-    N = rms(noisy_signal - clean_signal)
-    print(N)
-    return 20 * np.log10(S / N)
-
-
-def generate_sliding_window_dataset(clean_data, noisy_data, window_size):
-    num_streams, stream_length = clean_data.shape
-    assert noisy_data.shape == clean_data.shape
-    windows_total = []
-    next_values_total = []
-
-    for i in range(num_streams):
-        for j in range(stream_length - window_size):
-            windows_total.append(noisy_data[i, j:j + window_size])
-            next_values_total.append(clean_data[i, j + window_size])
-
-    windows_total = np.array(windows_total, dtype=np.float32)
-    next_values_total = np.array(next_values_total, dtype=np.float32).reshape(-1, 1)
-
-    return windows_total, next_values_total
-
-
 # Load Data
-
-## Clean Data
-clean_data = pd.read_csv('data/noiselevel1e-4/clean/clean_1.csv', header=None, skiprows=1).values
-### Find Events
-events = detect_events(clean_data, 5e-6)
 
 # Create Results structure
 results = {
@@ -113,34 +99,37 @@ results = {
     '7e-4': {}
 }
 
-## Noisy Data
+## Clean and Noisy Data
 ### 2.2e-5
-results['2_2e-5']['raw'] = pd.read_csv('data/noiselevel2_2e-5/noisy/noisy_1.csv', header=None, skiprows=1).values
+results['2_2e-5']['clean'] = read_and_stack_csv_files('data/noiselevel2_2e-5/clean/')
+results['2_2e-5']['raw'] = read_and_stack_csv_files('data/noiselevel2_2e-5/noisy/')
 ## 5e-5
-results['5e-5']['raw'] = pd.read_csv('data/noiselevel5e-5/noisy/noisy_1.csv', header=None, skiprows=1).values
+results['5e-5']['clean'] = read_and_stack_csv_files('data/noiselevel5e-5/clean/')
+results['5e-5']['raw'] = read_and_stack_csv_files('data/noiselevel5e-5/noisy/')
 ### 1e-4
-results['1e-4']['raw'] = pd.read_csv('data/noiselevel1e-4/noisy/noisy_1.csv', header=None, skiprows=1).values
+results['1e-4']['clean'] = read_and_stack_csv_files('data/noiselevel1e-4/clean/')
+results['1e-4']['raw'] = read_and_stack_csv_files('data/noiselevel1e-4/noisy/')
 ### 2e-4
-results['2e-4']['raw'] = pd.read_csv('data/noiselevel2e-4/noisy/noisy_1.csv', header=None,
-                                     skiprows=1).values
+results['2e-4']['clean'] = read_and_stack_csv_files('data/noiselevel2e-4/clean/')
+results['2e-4']['raw'] = read_and_stack_csv_files('data/noiselevel2e-4/noisy/')
 ### 3e-4
-results['3e-4']['raw'] = pd.read_csv('data/noiselevel3e-4/noisy/noisy_1.csv', header=None, skiprows=1).values
+results['3e-4']['clean'] = read_and_stack_csv_files('data/noiselevel3e-4/clean/')
+results['3e-4']['raw'] = read_and_stack_csv_files('data/noiselevel3e-4/noisy/')
 ### 5e-4
-results['5e-4']['raw'] = pd.read_csv('data/noiselevel5e-4/noisy/noisy_1.csv', header=None, skiprows=1).values
+results['5e-4']['clean'] = read_and_stack_csv_files('data/noiselevel5e-4/clean/')
+results['5e-4']['raw'] = read_and_stack_csv_files('data/noiselevel5e-4/noisy/')
 ### 7e-4
-results['7e-4']['raw'] = pd.read_csv('data/noiselevel7e-4/noisy/noisy_1.csv', header=None, skiprows=1).values
+results['7e-4']['clean'] = read_and_stack_csv_files('data/noiselevel7e-4/clean/')
+results['7e-4']['raw'] = read_and_stack_csv_files('data/noiselevel7e-4/noisy/')
 
 filtering_methods = ['nn', 'tf', 'af', 'sg']
 
-model_name = '071624_streams30_rate5_1e-4_256_64'
+model_path = './models/Custom_TF_stream_30_7e-4.pkl'
+scaler_x_path = './scalers/Custom_TF_stream_30_7e-4_X.pkl'
+scaler_y_path = './scalers/Custom_TF_stream_30_7e-4_y.pkl'
 window_size = 32
-### Load Model and Scalers
-with open(f'models/{model_name}.pkl', 'rb') as f:
-    model = pickle.load(f)
-with open(f'scalers/{model_name}_X.pkl', 'rb') as f:
-    scaler_X = pickle.load(f)
-with open(f'scalers/{model_name}_y.pkl', 'rb') as f:
-    scaler_y = pickle.load(f)
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
 
 i = 0
 
@@ -149,20 +138,25 @@ for noise_level, data in results.items():
     print(f"{noise_level}: {data.keys()}")
 
 for noise_level in results:
+    clean_data = results[noise_level]['clean']
     noisy_data = results[noise_level]['raw']
-    noisy_data = noisy_data.reshape((len(noisy_data), 1))
+
+    # Generate sliding window dataset
+    windows_total, next_values_total = generate_sliding_window_dataset_TSF(clean_data, noisy_data, window_size)
+
+    # Use the entire dataset for testing
+    X_test = windows_total
+    y_test = next_values_total
+
+
+    # Apply neural network
+    nn = apply_neural_network_denoising(X_test, model_path, scaler_x_path, scaler_y_path, device)
+
 
     # Filtering
 
-    ## NN
-    ### Apply Sliding window
-    windows, nvs = generate_sliding_window_dataset(clean_data.T, noisy_data.T, window_size)
-    X = scaler_X.transform(windows)
-    ### Prediction
-    nn = model.predict(X)
-    nn = scaler_y.inverse_transform(nn.reshape(-1, 1))
-
     ## TF
+    noisy_data = noisy_data.flatten()
     fs = 7196
     Q = 5
     ### Notch filtering of 60 hz
@@ -180,13 +174,13 @@ for noise_level in results:
     n_weights = 300
     mu = 0.5
     ### Apply function
-    af, err = af_method(noisy_data[:, 0], delay, n_weights, mu)
+    af, err = af_method(noisy_data, delay, n_weights, mu)
 
     ## SG
     window_l = 10
     polyorder = 3
     ### Apply Function
-    sg = ss.savgol_filter(noisy_data[:, 0], window_l, polyorder)
+    sg = ss.savgol_filter(noisy_data, window_l, polyorder)
 
     ## Write results
     results[noise_level]['nn'] = nn
@@ -219,19 +213,36 @@ for noise_level in results:
     }
 
     ## Base SNRs
-    scores['snr']['total']['raw'] = snr_calc_updated(clean_data, results[noise_level]['raw'])
+    scores['snr']['total']['raw'] = snr_calc(results[noise_level]['clean'], results[noise_level]['raw'])
+    # event_snr = []
+    # events = detect_event_regions(results[noise_level]['clean'], 5e-6)
+    # scores['snr']['event']['raw'] = calculate_event_snr(results[noise_level]['clean'], results[noise_level]['raw'], events)
+
     event_snr = []
-    events = detect_events(clean_data, 1e-6)
-    for event in events:
-        event_start, event_end = event[0], event[1]
-        event_snr.append(
-            snr_calc(clean_data[event_start:event_end], results[noise_level]['raw'][event_start:event_end]))
-    scores['snr']['event']['raw'] = np.mean(event_snr)
+
+    # Process each file
+    for (clean, sig) in zip(results[noise_level]['clean'], results[noise_level]['raw']):
+        # Detect events
+        events = detect_event_regions(clean, threshold=5e-6)
+
+        if events:
+            # Calculate SNR using identified events
+            snr_value = calculate_event_snr(clean, sig, events)
+            event_snr.append(snr_value)
+        else:
+            event_snr.append(np.nan)  # Append NaN if no events are found
+
+    # Final SNR
+    SNR_total = np.nanmean(event_snr)  # Use nanmean to skip NaNs if no events exist
+    print(f"SNR total for {noise_level}: {SNR_total}")
+    scores['snr']['event']['raw'] = SNR_total
 
     ## Method Metrics
+    clean_data = results[noise_level]['clean']
     for method in filtering_methods:
 
         clean = clean_data
+        clean = clean.flatten()
 
         ### Overcome delays
         if method == 'nn':
@@ -241,12 +252,14 @@ for noise_level in results:
 
         filtered_data = results[noise_level][method]
 
-        if filtered_data.shape != clean.shape:
-            filtered_data = np.reshape(filtered_data, clean.shape)
+        if clean.shape[0] != filtered_data.shape[0]:
+            min_length = min(clean.shape[0], filtered_data.shape[0])
+            clean = clean[:min_length]
+            filtered_data = filtered_data[:min_length]
 
         print(method, clean.shape, filtered_data.shape)
 
-        scores['snr']['total'][method] = snr_calc_updated(clean, filtered_data)
+        scores['snr']['total'][method] = snr_calc(clean, filtered_data)
         scores['mse']['total'][method] = mean_squared_error(clean, filtered_data)
         scores['mae']['total'][method] = mean_absolute_error(clean, filtered_data)
         scores['r2']['total'][method] = r2_score(clean, filtered_data)
@@ -255,7 +268,7 @@ for noise_level in results:
         event_mse = []
         event_mae = []
         event_r2 = []
-        events = detect_events(clean, 1e-6)
+        events = detect_event_regions(clean, 5e-6)
         for event in events:
             event_start, event_end = event[0], event[1]
 
@@ -272,83 +285,4 @@ for noise_level in results:
     with open(f'results/{noise_level}_results.json', 'w') as fp:
         json.dump(scores, fp, indent=4)
 
-# Select a noise level for this plot.
-nl = '7e-4'
-
-colors = {
-    'raw': '#9BBB59',
-    'nn': '#4f81bd',
-    'tf': '#c0504d',
-    'sg': '#8064a2'
-}
-
-plt.rcParams.update({"font.family": "Arial", })
-
-
-# Plotting
-def format_axes(fig):
-    for i, ax in enumerate(fig.axes):
-        #ax.text(0.5, 0.5, "ax%d" % (i+1), va="center", ha="center")
-        ax.tick_params(labelbottom=False, labelleft=False)
-        #ax.xaxis.set_major_locator(ticker.NullLocator())
-        #ax.yaxis.set_major_locator(ticker.NullLocator())
-
-
-fig = plt.figure(layout='constrained')
-fig.set_size_inches(14, 7)
-subfigs = fig.subfigures(2, 1)
-
-ax1 = subfigs[0].subplots(1, 1)
-ax_bottom = subfigs[1].subplots(1, 3, sharey=True)
-ax2 = ax_bottom[0]
-ax3 = ax_bottom[1]
-ax4 = ax_bottom[2]
-
-# ax1
-#ax1.set_title('Noise level: 1e-4')
-ax1.plot(results[nl]['raw'][window_size:], label='Noisy', color=colors['raw'])
-ax1.plot(clean_data[window_size:], label='Noiseless', color='#F79646', linewidth=3)
-ax1.set_xlim([60000, 77500])
-ax1.legend(loc='upper right', fontsize='large')
-ax1.set_title(f'Synthetically Generated Data with Noise Level {nl}', fontsize=16)
-ax1.set_ylabel('Amplitude (V)', fontsize=16)
-ax1.set_xlabel('Samples', fontsize=16)
-
-# ax2
-ax2.plot(clean_data[window_size:], label='Actual', color=colors['raw'], linewidth=3)
-#ax2.plot(results[nl]['af'], label='af', linestyle=':', color='blue')
-ax2.plot(results[nl]['sg'][window_size:], label='sg', linestyle='-.', color=colors['sg'])
-ax2.plot(results[nl]['nn'], label='nn', linestyle='--', color=colors['nn'])
-ax2.plot(results[nl]['tf'].T[window_size:], label='tf', linestyle=':', color=colors['tf'])
-ax2.set_xlim([64850, 65000])
-#ax2.set_ylim([-0.0006, 0.00035])
-ax2.legend(loc='lower right', fontsize='large')
-ax2.set_ylabel('Amplitude (V)', fontsize=16)
-ax2.set_xlabel('Samples', fontsize=16)
-
-# ax3
-ax3.plot(clean_data[window_size:], label='Actual', color=colors['raw'], linewidth=3)
-#ax3.plot(results[nl]['af'], label='af', linestyle=':', color='blue')
-ax3.plot(results[nl]['sg'][window_size:], label='sg', linestyle='-.', color=colors['sg'])
-ax3.plot(results[nl]['nn'], label='nn', linestyle='--', color=colors['nn'])
-ax3.plot(results[nl]['tf'].T[window_size:], label='tf', linestyle=':', color=colors['tf'])
-ax3.set_xlim([67540, 67650])
-#ax3.set_ylim([-0.0006, 0.0004])
-ax3.legend(loc='lower right', fontsize='large')
-ax3.set_xlabel('Samples', fontsize=16)
-
-# ax4
-ax4.plot(clean_data[window_size:], label='Actual', color=colors['raw'], linewidth=3)
-#ax4.plot(results[nl]['af'], label='af', linestyle=':', color='blue')
-ax4.plot(results[nl]['sg'][window_size:], label='sg', linestyle='-.', color=colors['sg'])
-ax4.plot(results[nl]['nn'], label='nn', linestyle='--', color=colors['nn'])
-ax4.plot(results[nl]['tf'].T[window_size:], label='tf', linestyle=':', color=colors['tf'])
-ax4.set_xlim([72875, 73000])
-ax4.set_ylim([-0.00065, 0.0004])
-ax4.legend(loc='lower right', fontsize='large')
-ax4.set_xlabel('Samples', fontsize=16)
-
-#format_axes(fig)
-plt.savefig(f"./results/plot_noise_{nl}.png", bbox_inches='tight')
-
-plt.show()
+    print(f"Completed processing for noise level {noise_level}")
