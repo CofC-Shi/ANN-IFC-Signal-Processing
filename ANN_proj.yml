@@ -1,0 +1,20 @@
+name: ANN_proj
+channels:
+  - pytorch
+  - anaconda
+  - defaults
+dependencies:
+  - pyyaml=5.4.1
+  - numpy
+  - python
+  - pytorch
+  - torchvision
+  - scipy==1.13.1
+  - librosa
+  - pip:
+      - matplotlib
+      - pandas
+      - scikit-learn
+      - padasip
+      - Qt5Agg
+

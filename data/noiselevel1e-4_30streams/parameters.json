@@ -1,0 +1,12 @@
+{
+    "dataset_params": {
+        "num_streams": 30,
+        "sampling_freq": 7196,
+        "data_time": 30,
+        "pink_noise_level": 5e-06,
+        "periodic_noise_level": 0.0001
+    },
+    "event_params": {
+        "event_rate": 5
+    }
+}

@@ -1,0 +1,19 @@
+{
+    "dataset_params": {
+        "bead_diameter": 7.32e-06,
+        "num_streams": 1,
+        "sampling_freq": 7196,
+        "data_time": 30,
+        "pink_noise_level": 5e-06,
+        "periodic_noise_level": 0.0003
+    },
+    "event_params": {
+        "transit_time_mean": 0.001852312,
+        "transit_time_sd": 0.000290812984,
+        "pos_amp_mean": -0.000200818262016,
+        "pos_amp_sd": 8.03273048064e-05,
+        "neg_amp_mean": -0.0004876232419187005,
+        "neg_amp_sd": 0.0001950492967674802,
+        "event_rate": 5
+    }
+}
